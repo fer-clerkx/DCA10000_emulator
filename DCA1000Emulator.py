@@ -9,6 +9,13 @@ class DCA1000Emulator:
     # Packet format constants
     PACKET_HEADER = 0xA55A
 
+    # Packet command codes
+    CODE_FPGA_VERSION = 0x000E
+
+    # FPGA version constants
+    FPGA_VERSION_MAJOR = 2
+    FPGA_VERSION_MINOR = 9
+
     def __init__(self):
         # Parse JSON file
         print(f"Parsing {self.CONFIG_FILE}.")
@@ -32,6 +39,7 @@ class DCA1000Emulator:
             while True:
                 self.receive_packet()
                 self.check_header()
+                self.process()
         except KeyboardInterrupt:
             print("Program interrupted by user.")
             self.config_socket.close()
@@ -56,6 +64,22 @@ class DCA1000Emulator:
         if self.read_bytes(2) != self.PACKET_HEADER:
             print("Incorrect packet header, packet dropped.")
             self.buffer = bytes()
+
+    def process(self):
+        command_code = self.read_bytes(2)
+        match command_code:
+            case self.CODE_FPGA_VERSION:
+                print("Processing read FPGA version command")
+                _ = self.read_fpga_version()  # Ignore response data for now
+            case _:
+                print("Incorrect command code, packet dropped.")
+                self.buffer = bytes()
+
+    def read_fpga_version(self):
+        _ = self.read_bytes(2)  # Ignore data size field
+        minor_field = f'{self.FPGA_VERSION_MINOR:07b}'
+        major_field = f'{self.FPGA_VERSION_MAJOR:07b}'
+        return int(f'00{minor_field}{major_field}', 2).to_bytes(2, 'little')
 
     def read_bytes(self, num_bytes):
         value = int.from_bytes(self.buffer[:num_bytes], 'little')
