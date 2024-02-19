@@ -8,6 +8,7 @@ class DCA1000Emulator:
 
     # Packet format constants
     PACKET_HEADER = 0xA55A
+    PACKET_FOOTER = 0xEEAA
 
     # Packet command codes
     CODE_FPGA_VERSION = 0x000E
@@ -40,6 +41,7 @@ class DCA1000Emulator:
                 self.receive_packet()
                 self.check_header()
                 self.process()
+                self.check_footer()
         except KeyboardInterrupt:
             print("Program interrupted by user.")
             self.config_socket.close()
@@ -80,6 +82,11 @@ class DCA1000Emulator:
         minor_field = f'{self.FPGA_VERSION_MINOR:07b}'
         major_field = f'{self.FPGA_VERSION_MAJOR:07b}'
         return int(f'00{minor_field}{major_field}', 2).to_bytes(2, 'little')
+
+    def check_footer(self):
+        if self.read_bytes(2) != self.PACKET_FOOTER:
+            print("Incorrect packet footer, packet dropped.")
+            # TODO: throw exception
 
     def read_bytes(self, num_bytes):
         value = int.from_bytes(self.buffer[:num_bytes], 'little')
