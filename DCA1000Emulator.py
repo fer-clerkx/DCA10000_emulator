@@ -6,6 +6,9 @@ class DCA1000Emulator:
     CONFIG_FILE = "ConfigFile.json"
     COMMAND_REQ_MAX_SIZE = 512
 
+    # Packet format constants
+    PACKET_HEADER = 0xA55A
+
     def __init__(self):
         # Parse JSON file
         print(f"Parsing {self.CONFIG_FILE}.")
@@ -28,6 +31,7 @@ class DCA1000Emulator:
 
             while True:
                 self.receive_packet()
+                self.check_header()
         except KeyboardInterrupt:
             print("Program interrupted by user.")
             self.config_socket.close()
@@ -47,3 +51,13 @@ class DCA1000Emulator:
                 else:
                     print("Incorrect client address, packet dropped.")
                     self.buffer = bytes()
+
+    def check_header(self):
+        if self.read_bytes(2) != self.PACKET_HEADER:
+            print("Incorrect packet header, packet dropped.")
+            self.buffer = bytes()
+
+    def read_bytes(self, num_bytes):
+        value = int.from_bytes(self.buffer[:num_bytes], 'little')
+        self.buffer = self.buffer[num_bytes:]
+        return value
