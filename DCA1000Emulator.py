@@ -5,9 +5,14 @@ from PacketFormatError import PacketFormatError
 
 class DCA1000Emulator:
 
-    CONFIG_FILE = "ConfigFile.json"
+    HW_CONFIG_FILE = "BoardSettings.json"
+    EEPROM_CONFIG_FILE = "EEPROM.json"
     COMMAND_REQ_MAX_SIZE = 512
-    CLI_IP_ADDR = "169.254.235.8"
+
+    # FPGA hardcoded data
+    FPGA_IP = "192.168.33.180"
+    SYSTEM_IP = "192.168.33.30"
+    CONFIG_PORT = 4096
 
     # Packet format constants
     PACKET_HEADER = 0xA55A
@@ -22,18 +27,6 @@ class DCA1000Emulator:
     FPGA_VERSION_MINOR = 9
 
     def __init__(self):
-        # Parse JSON file
-        print(f"Parsing {self.CONFIG_FILE}.")
-        with open(self.CONFIG_FILE) as config_file:
-            json_config = json.load(config_file)
-        ip_addr = json_config["DCA1000Config"]\
-            ["ethernetConfig"]["DCA1000IPAddress"]
-        config_port = json_config["DCA1000Config"]\
-            ["ethernetConfig"]["DCA1000ConfigPort"]
-
-        self.dca_address = (ip_addr, config_port)
-        self.cli_address = (self.CLI_IP_ADDR, config_port)
-
         # Create UDP sockets
         self.config_rx_socket = socket.socket(socket.AF_INET,
                                               socket.SOCK_DGRAM)
@@ -43,6 +36,7 @@ class DCA1000Emulator:
 
     def run(self):
         try:
+            self.boot()
             # Bind sockets
             self.config_rx_socket.bind(self.dca_address)
             print(f"UDP socket bound to {self.dca_address[0]}:"
@@ -65,6 +59,29 @@ class DCA1000Emulator:
             self.config_rx_socket.close()
             self.config_tx_socket.close()
             print(f"Closed UDP sockets.")
+
+    def boot(self):
+        print("Starting DCA1000.")
+        with open(self.HW_CONFIG_FILE, "r") as file:
+            json_board_config = json.load(file)
+        if json_board_config["switch2"]["SW2.5"] == "CONFIG_VIA_HW":
+            if json_board_config["switch2"]["SW2.6"] == "GND":
+                print("Using default ethernet configuration.")
+                dca_ip = self.FPGA_IP
+                cli_ip = self.SYSTEM_IP
+                config_port = self.CONFIG_PORT
+            else:
+                print("Using EEPROM ethernet configuration.")
+                with open(self.EEPROM_CONFIG_FILE, "r") as file:
+                    json_eeprom_config = json.load(file)
+                dca_ip = json_eeprom_config["FPGAIP"]
+                cli_ip = json_eeprom_config["SystemIP"]
+                config_port = json_eeprom_config["ConfigPort"]
+            self.dca_address = (dca_ip, config_port)
+            self.cli_address = (cli_ip, config_port)
+        else:
+            # TODO: add ethernet config update functionality
+            raise NotImplementedError()
 
     def receive_packet(self):
         while True:
