@@ -1,6 +1,8 @@
 import json
 import socket
 
+from PacketFormatError import PacketFormatError
+
 class DCA1000Emulator:
 
     CONFIG_FILE = "ConfigFile.json"
@@ -46,11 +48,17 @@ class DCA1000Emulator:
                                       f"{self.dca_address[1]}.")
 
             while True:
-                self.receive_packet()
-                self.check_header()
-                self.process()
-                self.check_footer()
-                self.send_response()
+                try:
+                    self.receive_packet()
+                    self.check_header()
+                    self.process()
+                    self.check_footer()
+                    self.send_response()
+                except PacketFormatError as e:
+                    print(e)
+                    self.buffer = bytes()
+                    self.command_code = 0
+                    self.status = bytes()
         except KeyboardInterrupt:
             print("Program interrupted by user.")
             self.config_rx_socket.close()
@@ -66,16 +74,11 @@ class DCA1000Emulator:
                 pass
             else:
                 print(f"Received packet from {client_address}.")
-                if client_address == self.dca_address:
-                    break
-                else:
-                    print("Incorrect client address, packet dropped.")
-                    self.buffer = bytes()
+                break
 
     def check_header(self):
         if self.read_bytes(2) != self.PACKET_HEADER:
-            print("Incorrect packet header, packet dropped.")
-            self.buffer = bytes()
+            raise PacketFormatError("packet header")
 
     def process(self):
         self.command_code = self.read_bytes(2)
@@ -84,8 +87,7 @@ class DCA1000Emulator:
                 print("Processing read FPGA version command")
                 self.read_fpga_version()
             case _:
-                print("Incorrect command code, packet dropped.")
-                self.buffer = bytes()
+                raise PacketFormatError("command code")
 
     def read_fpga_version(self):
         _ = self.read_bytes(2)  # Ignore data size field
@@ -96,8 +98,7 @@ class DCA1000Emulator:
 
     def check_footer(self):
         if self.read_bytes(2) != self.PACKET_FOOTER:
-            print("Incorrect packet footer, packet dropped.")
-            # TODO: throw exception
+            raise PacketFormatError("packet footer")
 
     def send_response(self):
         packet = (self.PACKET_HEADER.to_bytes(2, 'little')
