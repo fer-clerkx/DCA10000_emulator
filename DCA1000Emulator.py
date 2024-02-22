@@ -68,11 +68,11 @@ class DCA1000Emulator:
             self.buffer = bytes()
 
     def process(self):
-        command_code = self.read_bytes(2)
-        match command_code:
+        self.command_code = self.read_bytes(2)
+        match self.command_code:
             case self.CODE_FPGA_VERSION:
                 print("Processing read FPGA version command")
-                _ = self.read_fpga_version()  # Ignore response data for now
+                self.read_fpga_version()
             case _:
                 print("Incorrect command code, packet dropped.")
                 self.buffer = bytes()
@@ -81,7 +81,8 @@ class DCA1000Emulator:
         _ = self.read_bytes(2)  # Ignore data size field
         minor_field = f'{self.FPGA_VERSION_MINOR:07b}'
         major_field = f'{self.FPGA_VERSION_MAJOR:07b}'
-        return int(f'00{minor_field}{major_field}', 2).to_bytes(2, 'little')
+        rec_play_field = f'0'  # Record bit
+        self.status = int(f'0{rec_play_field}{minor_field}{major_field}', 2)
 
     def check_footer(self):
         if self.read_bytes(2) != self.PACKET_FOOTER:
