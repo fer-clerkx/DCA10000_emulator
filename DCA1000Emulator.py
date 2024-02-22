@@ -14,6 +14,7 @@ class DCA1000Emulator:
     PACKET_FOOTER = 0xEEAA
 
     # Packet command codes
+    CODE_RESET_RADAR = 0x0002
     CODE_FPGA_VERSION = 0x000E
 
     # FPGA version constants
@@ -83,11 +84,18 @@ class DCA1000Emulator:
     def process(self):
         self.command_code = self.read_bytes(2)
         match self.command_code:
+            case self.CODE_RESET_RADAR:
+                print("Processing reset radar EVM command")
+                self.reset_radar_EVM()
             case self.CODE_FPGA_VERSION:
                 print("Processing read FPGA version command")
                 self.read_fpga_version()
             case _:
                 raise PacketFormatError("command code")
+
+    def reset_radar_EVM(self):
+        _ = self.read_bytes(2)  # Ignore data size field
+        self.status = 0  # Success
 
     def read_fpga_version(self):
         _ = self.read_bytes(2)  # Ignore data size field
