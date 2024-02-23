@@ -19,6 +19,7 @@ class DCA1000Emulator:
     PACKET_FOOTER = 0xEEAA
 
     # Packet command codes
+    CODE_RESET_FPGA = 0x0001
     CODE_RESET_RADAR = 0x0002
     CODE_FPGA_VERSION = 0x000E
 
@@ -26,21 +27,9 @@ class DCA1000Emulator:
     FPGA_VERSION_MAJOR = 2
     FPGA_VERSION_MINOR = 9
 
-    def __init__(self):
-        # Create UDP sockets
-        self.config_rx_socket = socket.socket(socket.AF_INET,
-                                              socket.SOCK_DGRAM)
-        self.config_rx_socket.setblocking(False)
-        self.config_tx_socket = socket.socket(socket.AF_INET,
-                                                socket.SOCK_DGRAM)
-
     def run(self):
         try:
             self.boot()
-            # Bind sockets
-            self.config_rx_socket.bind(self.dca_address)
-            print(f"UDP socket bound to {self.dca_address[0]}:"
-                                      f"{self.dca_address[1]}.")
 
             while True:
                 try:
@@ -62,6 +51,14 @@ class DCA1000Emulator:
 
     def boot(self):
         print("Starting DCA1000.")
+        # Create UDP sockets
+        self.config_rx_socket = socket.socket(socket.AF_INET,
+                                              socket.SOCK_DGRAM)
+        self.config_rx_socket.setblocking(False)
+        self.config_tx_socket = socket.socket(socket.AF_INET,
+                                                socket.SOCK_DGRAM)
+
+        # Read JSON configs
         with open(self.HW_CONFIG_FILE, "r") as file:
             json_board_config = json.load(file)
         if json_board_config["switch2"]["SW2.5"] == "CONFIG_VIA_HW":
@@ -83,6 +80,16 @@ class DCA1000Emulator:
             # TODO: add ethernet config update functionality
             raise NotImplementedError()
 
+        # Initialize properties
+        self.buffer = bytes()
+        self.command_code = 0
+        self.status = bytes()
+
+        # Bind sockets
+        self.config_rx_socket.bind(self.dca_address)
+        print(f"UDP socket bound to {self.dca_address[0]}:"
+                                  f"{self.dca_address[1]}.")
+
     def receive_packet(self):
         while True:
             try:
@@ -101,6 +108,9 @@ class DCA1000Emulator:
     def process(self):
         self.command_code = self.read_bytes(2)
         match self.command_code:
+            case self.CODE_RESET_FPGA:
+                print("Processing reset FPGA command")
+                self.reset_FPGA()
             case self.CODE_RESET_RADAR:
                 print("Processing reset radar EVM command")
                 self.reset_radar_EVM()
@@ -109,6 +119,13 @@ class DCA1000Emulator:
                 self.read_fpga_version()
             case _:
                 raise PacketFormatError("command code")
+
+    def reset_FPGA(self):
+        self.config_rx_socket.close()
+        self.config_tx_socket.close()
+        self.boot()
+        self.command_code = self.CODE_RESET_FPGA
+        self.status = 0  # Success
 
     def reset_radar_EVM(self):
         _ = self.read_bytes(2)  # Ignore data size field
