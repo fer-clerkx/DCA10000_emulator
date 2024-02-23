@@ -46,8 +46,8 @@ class DCA1000Emulator:
                 try:
                     self.receive_packet()
                     self.check_header()
-                    self.process()
                     self.check_footer()
+                    self.process()
                     self.send_response()
                 except PacketFormatError as e:
                     print(e)
@@ -122,8 +122,9 @@ class DCA1000Emulator:
         self.status = int(f'0{rec_play_field}{minor_field}{major_field}', 2)
 
     def check_footer(self):
-        if self.read_bytes(2) != self.PACKET_FOOTER:
+        if int.from_bytes(self.buffer[-2:], 'little') != self.PACKET_FOOTER:
             raise PacketFormatError("packet footer")
+        self.buffer = self.buffer[:-2]
 
     def send_response(self):
         packet = (self.PACKET_HEADER.to_bytes(2, 'little')
