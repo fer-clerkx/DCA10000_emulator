@@ -1,9 +1,0 @@
-{
-	"DCA1000Config": {
-		"ethernetConfig": {
-			"DCA1000IPAddress": "127.0.0.1",
-			"DCA1000ConfigPort": 4096,
-			"DCA1000DataPort": 4098
-		}
-	}
-}
